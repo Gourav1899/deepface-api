@@ -1,7 +1,7 @@
-fastapi
-uvicorn
-deepface
-pymongo
-numpy
-python-multipart
-tensorflow-cpu
+fastapi==0.110.0
+uvicorn==0.29.0
+deepface==0.0.79
+pymongo==4.6.1
+numpy==1.23.5
+python-multipart==0.0.9
+tensorflow-cpu==2.10.1
