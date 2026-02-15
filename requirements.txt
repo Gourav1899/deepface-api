@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+deepface
+pymongo
+numpy
+python-multipart
+tensorflow-cpu
