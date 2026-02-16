@@ -1,9 +1,7 @@
-fastapi==0.95.2
-uvicorn==0.22.0
-deepface==0.0.79
-pymongo==4.3.3
-numpy==1.23.5
-python-multipart==0.0.6
-tensorflow-cpu==2.10.1
-setuptools==65.5.0
-wheel==0.38.4
+fastapi
+uvicorn
+deepface
+opencv-python-headless
+numpy
+pymongo
+python-multipart
