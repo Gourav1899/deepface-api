@@ -8,65 +8,71 @@ from io import BytesIO
 from PIL import Image
 from numpy import dot
 from numpy.linalg import norm
+import uuid
 
 app = FastAPI()
 
+# ===============================
+# MongoDB Setup
+# ===============================
 MONGO_URI = os.getenv("MONGO_URI")
-
 client = MongoClient(MONGO_URI)
 db = client["studioDB"]
 
-# cosine similarity function
+# ===============================
+# Load Model at Startup (IMPORTANT)
+# ===============================
+@app.on_event("startup")
+def load_model():
+    print("Loading FaceNet model...")
+    DeepFace.build_model("Facenet")
+    print("Model Loaded Successfully")
+
+# ===============================
+# Cosine Similarity
+# ===============================
 def cosine_similarity(a, b):
     return dot(a, b) / (norm(a) * norm(b))
 
-
 @app.get("/")
 def home():
-    return {"message": "API running"}
+    return {"message": "API running 🚀"}
 
-
-# ============================================
-# NEW ENDPOINT: generate embedding from image_url
-# ============================================
+# ==================================================
+# Generate Embedding from Image URL
+# ==================================================
 @app.post("/generate-embedding")
 async def generate_embedding(data: dict = Body(...)):
-
     try:
         image_url = data.get("image_url")
-        access_token = data.get("access_token")
         event_id = data.get("event_id")
 
-        if not image_url:
-            return {"error": "image_url required"}
+        if not image_url or not event_id:
+            return {"error": "image_url and event_id required"}
 
-        headers = {}
-        if access_token:
-            headers["Authorization"] = f"Bearer {access_token}"
-
-        # download image
-        response = requests.get(image_url, headers=headers)
+        response = requests.get(image_url)
 
         if response.status_code != 200:
             return {"error": "Failed to download image"}
 
-        # save temp image
-        image = Image.open(BytesIO(response.content))
-        image_np = np.array(image)
+        # Save temp file safely
+        temp_filename = f"temp_{uuid.uuid4()}.jpg"
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        image.save(temp_filename)
 
-        # generate embedding
         embeddings = DeepFace.represent(
-            img_path=image_np,
+            img_path=temp_filename,
             model_name="Facenet",
             enforce_detection=False
         )
+
+        os.remove(temp_filename)
 
         if not embeddings:
             return {"faces_found": 0}
 
         embedding = embeddings[0]["embedding"]
 
-        # save in MongoDB
         db.images.insert_one({
             "event_id": event_id,
             "image_url": image_url,
@@ -81,10 +87,9 @@ async def generate_embedding(data: dict = Body(...)):
     except Exception as e:
         return {"error": str(e)}
 
-
-# ============================================
-# EXISTING ENDPOINT: match customer face
-# ============================================
+# ==================================================
+# Match Customer Face
+# ==================================================
 @app.post("/match")
 async def match_face(
     event_id: str = Form(...),
@@ -92,42 +97,48 @@ async def match_face(
     mobile: str = Form(...),
     file: UploadFile = File(...)
 ):
+    try:
+        temp_filename = f"temp_{uuid.uuid4()}.jpg"
 
-    with open("temp.jpg", "wb") as f:
-        f.write(await file.read())
+        with open(temp_filename, "wb") as f:
+            f.write(await file.read())
 
-    embedding = DeepFace.represent(
-        img_path="temp.jpg",
-        model_name="Facenet",
-        enforce_detection=False
-    )[0]["embedding"]
+        embedding = DeepFace.represent(
+            img_path=temp_filename,
+            model_name="Facenet",
+            enforce_detection=False
+        )[0]["embedding"]
 
-    images = db.images.find({"event_id": event_id})
+        os.remove(temp_filename)
 
-    matched = []
+        images = db.images.find({"event_id": event_id})
+        matched = []
 
-    for img in images:
-        score = cosine_similarity(
-            np.array(embedding),
-            np.array(img["embedding"])
-        )
-        if score > 0.75:
-            matched.append(img["image_url"])
+        for img in images:
+            score = cosine_similarity(
+                np.array(embedding),
+                np.array(img["embedding"])
+            )
 
-    db.customers.insert_one({
-        "event_id": event_id,
-        "name": name,
-        "mobile": mobile,
-        "matched_images": matched
-    })
+            if score > 0.65:   # Optimized threshold
+                matched.append(img["image_url"])
 
-    return {"matched_images": matched}
+        db.customers.insert_one({
+            "event_id": event_id,
+            "name": name,
+            "mobile": mobile,
+            "matched_images": matched
+        })
 
+        return {"matched_images": matched}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/test-db")
 def test_db():
     try:
         db.events.insert_one({"test": "success"})
-        return {"status": "MongoDB connected"}
+        return {"status": "MongoDB connected ✅"}
     except Exception as e:
         return {"error": str(e)}
