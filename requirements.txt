@@ -7,3 +7,5 @@ opencv-python-headless==4.9.0.80
 numpy==1.26.4
 pymongo==4.6.1
 python-multipart==0.0.9
+pillow==10.2.0
+requests==2.31.0
