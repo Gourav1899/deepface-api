@@ -1,9 +1,13 @@
 services:
   - type: web
     name: deepface-api
-    env: docker
-    plan: free
+    runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.13
+      - key: MONGO_URI
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+    healthCheckPath: /health
+    # Auto-deploy on push
+    autoDeploy: true
