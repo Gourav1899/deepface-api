@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 # System dependencies for OpenCV + DeepFace
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -12,16 +12,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app
-COPY main.py .
-
-# Pre-download FaceNet512 model at build time
-# This means Render won't download it on every cold start
-RUN python -c "from deepface import DeepFace; DeepFace.build_model('Facenet512'); print('Model downloaded ✅')"
+COPY . .
 
 EXPOSE 8000
 
